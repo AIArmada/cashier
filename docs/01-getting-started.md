@@ -1,3 +1,7 @@
+---
+title: Getting Started
+---
+
 # Getting Started
 
 This guide will help you get started with the AIArmada Cashier package for multi-gateway billing.
@@ -6,7 +10,7 @@ This guide will help you get started with the AIArmada Cashier package for multi
 
 Before you begin, ensure you have:
 
-- PHP 8.2 or higher
+- PHP 8.4 or higher
 - Laravel 12.0 or higher
 - Composer installed
 - At least one payment gateway account (Stripe, CHIP, etc.)
@@ -33,11 +37,6 @@ composer require laravel/cashier
 composer require aiarmada/cashier-chip
 ```
 
-**For Paddle:**
-```bash
-composer require laravel/cashier-paddle
-```
-
 ### Step 3: Publish Configuration
 
 ```bash
@@ -46,21 +45,37 @@ php artisan vendor:publish --tag=cashier-config
 
 This will create `config/cashier.php` with all gateway settings.
 
-### Step 4: Run Migrations
+### Step 4: Run Gateway Migrations
+
+`aiarmada/cashier` is a wrapper layer only. It does **not** create its own unified
+subscription tables.
+
+Instead:
+
+- `laravel/cashier` owns Stripe tables such as `subscriptions` and `subscription_items`
+- `aiarmada/cashier-chip` owns CHIP tables such as `chip_subscriptions` and `chip_subscription_items`
+
+For Stripe, you may publish the vendor migrations when you need to customize them:
 
 ```bash
-php artisan vendor:publish --tag=cashier-migrations
+php artisan vendor:publish --tag=cashier-stripe-migrations
 php artisan migrate
 ```
 
-This creates the following tables:
-- `gateway_subscriptions` - Unified subscription storage
-- `gateway_subscription_items` - Subscription line items
+If you do not publish them, `aiarmada/cashier` will conditionally auto-load Laravel Cashier's
+vendor migrations as a fallback when `laravel/cashier` is installed.
 
-It also adds columns to your users table:
-- `stripe_id` - Stripe customer ID
-- `chip_id` - CHIP customer ID
-- `trial_ends_at` - Generic trial end date
+For CHIP, install `aiarmada/cashier-chip` and run your normal migrations:
+
+```bash
+php artisan migrate
+```
+
+That gives you gateway-owned billable columns such as:
+
+- `stripe_id` from `laravel/cashier`
+- `chip_id` from `aiarmada/cashier-chip`
+- gateway-specific subscription tables from the installed gateway packages
 
 ## Configuration
 
@@ -72,7 +87,9 @@ Add the following to your `.env` file:
 # Default Gateway
 CASHIER_GATEWAY=stripe
 CASHIER_CURRENCY=USD
-CASHIER_CURRENCY_LOCALE=en_US
+CASHIER_LOCALE=en
+CASHIER_STRIPE_CURRENCY_LOCALE=en_US
+CASHIER_CHIP_CURRENCY_LOCALE=ms_MY
 
 # Stripe Credentials
 STRIPE_KEY=pk_test_...
@@ -81,29 +98,33 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 # CHIP Credentials (if using CHIP)
 CHIP_BRAND_ID=your_brand_id
-CHIP_API_KEY=your_api_key
-CHIP_WEBHOOK_KEY=your_webhook_key
+CHIP_COLLECT_API_KEY=your_api_key
+CHIP_WEBHOOK_SECRET=your_webhook_secret
 ```
 
 ### Model Setup
 
-Add the `Billable` trait to your User model:
+Add the wrapper trait **and** the traits from the gateway packages you install:
 
 ```php
 <?php
 
 namespace App\Models;
 
-use AIArmada\Cashier\Billable;
+use AIArmada\Cashier\Billable as CashierBillable;
+use AIArmada\CashierChip\Billable as ChipBillable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Cashier\Billable as StripeBillable;
 
 class User extends Authenticatable
 {
-    use Billable;
+    use StripeBillable, ChipBillable, CashierBillable;
     
     // ...
 }
 ```
+
+Only include the gateway-specific traits for the gateways you actually install.
 
 ### Register Custom Customer Model (Optional)
 
@@ -127,8 +148,8 @@ use App\Models\User;
 
 $user = User::find(1);
 
-// Create a subscription on the default gateway (Stripe)
-$subscription = $user->newSubscription('default', 'price_monthly')
+// Create a subscription on the default configured gateway
+$subscription = $user->newGatewaySubscription('default', 'price_monthly')
     ->trialDays(14)
     ->create($paymentMethodId);
 
@@ -141,8 +162,8 @@ if ($subscription->valid()) {
 ### Processing a One-Time Payment
 
 ```php
-// Charge $10.00
-$payment = $user->charge(1000, $paymentMethodId);
+// Charge $10.00 on the default configured gateway
+$payment = $user->chargeWithGateway(1000, $paymentMethodId);
 
 if ($payment->isSuccessful()) {
     echo "Payment successful!";
@@ -155,10 +176,9 @@ if ($payment->isSuccessful()) {
 ### Creating a Checkout Session
 
 ```php
-$checkout = $user->checkout([
-    ['price' => 'price_xxx', 'quantity' => 1],
-    ['price' => 'price_yyy', 'quantity' => 2],
-])
+$checkout = $user->checkoutWithGateway('stripe')
+    ->price('price_xxx')
+    ->price('price_yyy', 2)
     ->successUrl(route('checkout.success'))
     ->cancelUrl(route('checkout.cancel'))
     ->create();
@@ -173,19 +193,19 @@ One of the key features is the ability to use multiple gateways:
 
 ```php
 // Create subscription on Stripe
-$stripeSubscription = $user->newSubscription('streaming', 'price_xxx', 'stripe')
+$stripeSubscription = $user->newGatewaySubscription('streaming', 'price_xxx', 'stripe')
     ->create();
 
 // Create subscription on CHIP for local payments
-$chipSubscription = $user->newSubscription('local-plan', 'plan_id', 'chip')
+$chipSubscription = $user->newGatewaySubscription('local-plan', 'plan_id', 'chip')
     ->create();
 
 // Query subscriptions per gateway
-$stripeSubscriptions = $user->subscriptions('stripe');
-$chipSubscriptions = $user->subscriptions('chip');
+$stripeSubscriptions = $user->gatewaySubscriptions('stripe');
+$chipSubscriptions = $user->gatewaySubscriptions('chip');
 
 // Get all subscriptions
-$allSubscriptions = $user->subscriptions();
+$allSubscriptions = $user->allSubscriptions();
 ```
 
 ### CHIP Subscription Scheduler
@@ -210,5 +230,5 @@ This is not needed for Stripe - Stripe handles subscription renewals automatical
 
 - [Subscriptions Guide](02-subscriptions.md) - Learn about managing subscriptions
 - [Payments Guide](03-payments.md) - Handle one-time payments
-- [Webhooks Guide](04-webhooks.md) - Set up webhook handling
-- [Multi-Gateway Guide](05-multi-gateway.md) - Advanced multi-gateway usage
+- [Multi-Gateway Guide](04-multi-gateway.md) - Advanced multi-gateway usage
+- [Webhooks Guide](05-webhooks.md) - Set up webhook handling

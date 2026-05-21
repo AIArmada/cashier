@@ -8,6 +8,7 @@ use AIArmada\Cashier\Contracts\PaymentContract;
 use AIArmada\CashierChip\Exceptions\IncompletePayment;
 use AIArmada\CashierChip\Payment;
 use AIArmada\Chip\Data\PurchaseData;
+use AIArmada\CommerceSupport\Support\MoneyFormatter;
 use Illuminate\Http\RedirectResponse;
 use InvalidArgumentException;
 
@@ -221,7 +222,13 @@ class ChipPayment implements PaymentContract
      */
     public function redirect(): RedirectResponse
     {
-        return redirect()->to($this->redirectUrl());
+        $url = $this->redirectUrl();
+
+        if (! is_string($url) || $url === '') {
+            throw new InvalidArgumentException('CHIP payment requires action but no redirect URL is available.');
+        }
+
+        return redirect()->to($url);
     }
 
     /**
@@ -233,7 +240,7 @@ class ChipPayment implements PaymentContract
             return $this->payment->currency();
         }
 
-        return $this->payment->purchase->currency ?? 'MYR';
+        return $this->payment->purchase->currency;
     }
 
     /**
@@ -245,7 +252,7 @@ class ChipPayment implements PaymentContract
             return $this->payment->amount();
         }
 
-        return number_format($this->rawAmount() / 100, 2) . ' ' . $this->currency();
+        return MoneyFormatter::formatMinorWithCode($this->rawAmount(), $this->currency());
     }
 
     /**
@@ -272,7 +279,21 @@ class ChipPayment implements PaymentContract
             return $this->payment->status();
         }
 
-        return $this->payment->status ?? 'unknown';
+        return $this->payment->status;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function metadata(): array
+    {
+        $payload = $this->payment instanceof Payment
+            ? $this->payment->asChipPurchase()->toArray()
+            : $this->payment->toArray();
+
+        $metadata = $payload['metadata'] ?? [];
+
+        return is_array($metadata) ? $metadata : [];
     }
 
     /**
