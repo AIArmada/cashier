@@ -1,17 +1,17 @@
 ---
-title: Getting Started
+title: Installation
 ---
 
-# Getting Started
+# Installation
 
-This guide will help you get started with the AIArmada Cashier package for multi-gateway billing.
+This guide installs `aiarmada/cashier` and the gateway packages it coordinates for multi-gateway billing.
 
 ## Prerequisites
 
 Before you begin, ensure you have:
 
 - PHP 8.4 or higher
-- Laravel 12.0 or higher
+- Laravel 13.0 or higher
 - Composer installed
 - At least one payment gateway account (Stripe, CHIP, etc.)
 
@@ -228,7 +228,9 @@ This is not needed for Stripe - Stripe handles subscription renewals automatical
 
 ## Next Steps
 
-- [Subscriptions Guide](02-subscriptions.md) - Learn about managing subscriptions
-- [Payments Guide](03-payments.md) - Handle one-time payments
-- [Multi-Gateway Guide](04-multi-gateway.md) - Advanced multi-gateway usage
-- [Webhooks Guide](05-webhooks.md) - Set up webhook handling
+- [Configuration Guide](03-configuration.md) - Review the published config and cart integration toggles
+- [Usage Guide](04-usage.md) - Start with the canonical entry point for unified billing flows
+- [Subscriptions Guide](05-subscriptions.md) - Learn about managing subscriptions
+- [Payments Guide](06-payments.md) - Handle one-time payments
+- [Multi-Gateway Guide](07-multi-gateway.md) - Advanced multi-gateway usage
+- [Webhooks Guide](08-webhooks.md) - Set up webhook handling
