@@ -50,12 +50,8 @@ php artisan cashier:webhook:replay evt_123 --gateway=stripe
 
 ```env
 STRIPE_WEBHOOK_SECRET=whsec_xxx
+CHIP_WEBHOOK_SECRET=your_webhook_secret
 ```
-
-> **warning**
-> CHIP has no shared webhook secret. Its signature is verified with an RSA public key fetched from
-> CHIP's `GET /public_key/` (or configured in `chip.collect.public_key`). Setting
-> `CHIP_WEBHOOK_SECRET` has no effect — `cashier-chip.webhooks.secret` is never read.
 
 ## Default Endpoints
 
@@ -64,7 +60,7 @@ Default webhook routes depend on the installed gateway packages:
 | Gateway | Owner | Default endpoint |
 |---------|-------|------------------|
 | Stripe | `laravel/cashier` | `/stripe/webhook` |
-| CHIP | `aiarmada/cashier-chip` | `/chip/webhooks` |
+| CHIP | `aiarmada/chip` (with `aiarmada/cashier-chip` listeners) | `/chip/webhooks` |
 
 If you customize the path in those packages, update your gateway dashboard to match.
 
@@ -92,10 +88,10 @@ If you customize the path in those packages, update your gateway dashboard to ma
 
 1. Go to the CHIP dashboard
 2. Add endpoint: `https://yourdomain.com/chip/webhooks`
-3. Ensure CHIP's Collect public key is reachable, or set it explicitly:
+3. Copy the webhook secret into `.env`:
 
    ```env
-   CHIP_COLLECT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----..."
+   CHIP_WEBHOOK_SECRET=your_webhook_secret
    ```
 
 ## Unified Events

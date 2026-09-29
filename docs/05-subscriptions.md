@@ -8,8 +8,7 @@ This guide covers the unified subscription helpers exposed by `aiarmada/cashier`
 
 ## Gateway Differences
 
-> **info**
-> Subscription behavior still depends on the underlying gateway package.
+> **Important:** Subscription behavior still depends on the underlying gateway package.
 
 | Feature | Stripe | CHIP |
 |---------|--------|------|

@@ -25,7 +25,6 @@ AIArmada Cashier lets you:
 | **Webhooks** | ✅ Yes | ✅ Yes |
 | **Scheduler required** | No | **Yes** |
 
-> **info**
 > **CHIP users:** schedule `cashier-chip:renew-subscriptions` in your console kernel.
 
 ## Customer IDs
@@ -34,22 +33,16 @@ Each installed gateway keeps its own customer identifier on the billable model.
 
 ### Storage
 
-Each installed gateway keeps its own customer identifier, but not in the same place:
-
 ```php
-// Stripe: laravel/cashier adds this to users
 Schema::table('users', function (Blueprint $table) {
     $table->string('stripe_id')->nullable()->index();
 });
 ```
 
-- `laravel/cashier` owns `users.stripe_id`
-- `aiarmada/cashier-chip` adds **no** column. `chipId()` resolves through the `chip_customers` link
-  table (`subject_type`, `subject_id`, `chip_customer_id`) owned by `aiarmada/chip`.
-
-> **warning**
-> Do not add a `users.chip_id` column. `ManagesGateway::gatewayId('chip')` calls `chipId()`, which
-> reads the link table; a `chip_id` attribute would be silently ignored.
+The `stripe_id` column comes from `laravel/cashier`. CHIP needs no extra
+column on your billable model: `aiarmada/cashier-chip` links billables to
+CHIP client IDs through the `chip_customers` table (owned by `aiarmada/chip`)
+and exposes the link as `$billable->chipId()`.
 
 ### Creating / Syncing Customers
 
@@ -157,9 +150,8 @@ $stripeCheckout = $user->checkoutWithGateway('stripe')
     ->cancelUrl(route('checkout.cancel'))
     ->create();
 
-// CHIP has no price IDs — every product needs an explicit amount in minor units.
 $chipCheckout = $user->checkoutWithGateway('chip')
-    ->product('Local Plan', 250000, 1)
+    ->product('Local Plan', 250000)
     ->successUrl(route('checkout.success'))
     ->cancelUrl(route('checkout.cancel'))
     ->create();
@@ -221,14 +213,10 @@ subscriptions
 subscription_items
 users.stripe_id
 
-// CHIP schema comes from aiarmada/cashier-chip (prefix via cashier-chip.database.table_prefix)
+// CHIP schema comes from aiarmada/cashier-chip
 cashier_chip_subscriptions
 cashier_chip_subscription_items
-cashier_chip_payment_methods
-cashier_chip_renewal_attempts
-
-// The customer link lives in aiarmada/chip
-chip_customers
+chip_customers (link table from aiarmada/chip; no users column needed)
 ```
 
 `aiarmada/cashier` does not create a unified `gateway_subscriptions` table. It wraps the
